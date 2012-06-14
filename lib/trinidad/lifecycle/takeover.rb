@@ -13,6 +13,7 @@ module Trinidad
 
             @old[:context].stop
             @old[:context].destroy
+            @old[:context].parent.remove_child(@old[:context])
 
             event.lifecycle.name = name
           ensure

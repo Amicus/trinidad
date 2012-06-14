@@ -14,10 +14,15 @@ describe "Trinidad::Lifecycle::Takeover" do
   let(:listener) do
     Trinidad::Lifecycle::Takeover.new(old_context)
   end
+  let(:context_parent) { mock }
+
 
   before do
+
     old_context[:context].expects(:stop).once
     old_context[:context].expects(:destroy).once
+    context_parent.expects(:remove_child)
+    old_context[:context].expects(:parent).returns(context_parent)
     expects_name_modification
   end
 
