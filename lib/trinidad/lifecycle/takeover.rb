@@ -15,7 +15,7 @@ module Trinidad
             @old[:context].destroy
             @old[:context].parent.remove_child(@old[:context])
 
-            #event.lifecycle.name = name
+            event.lifecycle.name = name
           ensure
             @old.delete(:lock)
           end
