@@ -61,13 +61,13 @@ module Trinidad
             app_holder.monitor_mtime = mtime
             app_holder.context = takeover_app_context(app_holder)
             
-            #Thread.new do
-            #  begin
-            #    app_holder.context.start
-            #  ensure
-            #    app_holder.unlock
-            #  end
-            #end
+            Thread.new do
+              begin
+                app_holder.context.start
+              ensure
+                app_holder.unlock
+              end
+            end
           end
         end
       end
