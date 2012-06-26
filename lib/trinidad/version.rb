@@ -1,3 +1,3 @@
 module Trinidad
-  VERSION = '1.3.8am'
+  VERSION = '1.3.9am'
 end
