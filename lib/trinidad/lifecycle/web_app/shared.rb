@@ -21,7 +21,7 @@ module Trinidad
         # Configure the web application before it's started.
         def configure(context)
           remove_defaults(context)
-          configure_logging(context)
+          #configure_logging(context)
         end
 
         protected
