@@ -1,9 +1,9 @@
-require File.dirname(__FILE__) + '/../spec_helper'
-require File.dirname(__FILE__) + '/fakeapp'
-include FileUtils
-include FakeApp
+require File.expand_path('../spec_helper', File.dirname(__FILE__))
+require 'fileutils'
 
 describe Trinidad::Server do
+  include FileUtils
+  include FakeApp
   
   JSystem = java.lang.System
   JContext = javax.naming.Context
@@ -156,7 +156,8 @@ describe Trinidad::Server do
     server = Trinidad::Server.new
     app_context = server.tomcat.host.find_child('/')
 
-    app_context.find_lifecycle_listeners.map {|l| l.class.name }.should include('Trinidad::Lifecycle::Default')
+    app_context.find_lifecycle_listeners.map {|l| l.class.name }.
+      should include('Trinidad::Lifecycle::WebApp::Default')
   end
 
   it "loads application extensions from the root of the configuration" do
@@ -195,9 +196,9 @@ describe Trinidad::Server do
 
   it "loads several applications if the option :apps_base is present" do
     begin
-      Dir.mkdir('apps_base')
-      cp_r MOCK_WEB_APP_DIR, 'apps_base/test'
+      mkdir 'apps_base'
       cp_r MOCK_WEB_APP_DIR, 'apps_base/test1'
+      cp_r MOCK_WEB_APP_DIR, 'apps_base/test2'
 
       server = Trinidad::Server.new({ :apps_base => 'apps_base' })
       server.tomcat.host.find_children.should have(2).web_apps
@@ -206,14 +207,14 @@ describe Trinidad::Server do
     end
   end
 
-  it "loads rack apps from the app_base directory" do
+  it "loads rack apps from the apps_base directory" do
     begin
-      Dir.mkdir('apps_base')
+      mkdir 'apps_base'
       cp_r MOCK_WEB_APP_DIR, 'apps_base/test'
 
       server = Trinidad::Server.new({ :apps_base => 'apps_base' })
       listeners = find_listeners(server)
-      listeners.first.webapp.should be_instance_of(Trinidad::RackupWebApp)
+      listeners.first.webapp.should be_a(Trinidad::RackupWebApp)
     ensure
       rm_rf 'apps_base'
     end

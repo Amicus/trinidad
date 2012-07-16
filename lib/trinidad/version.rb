@@ -1,3 +1,3 @@
 module Trinidad
-  VERSION = '1.3.9am'
+  VERSION = '1.4.0.RCam'
 end

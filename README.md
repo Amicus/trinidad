@@ -1,10 +1,11 @@
 # Trinidad
 
-Trinidad allows you to run a rails or rackup applications within an embedded Apache Tomcat container.
+Trinidad allows you to run Rails or Rack applications within an embedded 
+Apache Tomcat container.
 
-* Mail list: http://groups.google.com/group/rails-trinidad
-* Bug tracker: http://github.com/trinidad/trinidad/issues
-* Irc channel on Freenode: #trinidad
+* Mailing List: http://groups.google.com/group/rails-trinidad
+* Bug Tracker: http://github.com/trinidad/trinidad/issues
+* IRC Channel (on FreeNode): #trinidad
 
 ## Installation
 
@@ -19,17 +20,35 @@ $ cd myapp
 $ jruby -S trinidad
 ```
 
-### Advanced Rackup setup
+### Setup
+
+If you use Bundler, you might want to add Trinidad to your *Gemfile*:
+
+```
+gem 'trinidad', :require => nil
+```
+
+**Rails**
+
+If you have Trinidad in your Gemfile you can start it with `rails server`:
+
+```
+$ rails s trinidad
+```
+
+or simply, if you prefer not to use the Rack handler, use:
+
+```
+$ trinidad
+```
 
 **Sinatra**
-
-You can run your Sinatra application with Trinidad from the command line like this:
 
 ```
 $ ruby app.rb -s Trinidad
 ```
 
-Or tou can configure your application to always use it:
+or configure your application to always use Trinidad:
 
 ```ruby
 require 'sinatra'
@@ -38,20 +57,6 @@ require 'trinidad'
 configure do
   set :server, :trinidad
 end
-```
-
-If you use Bundler, make sure you add Trinidad to your Gemfile:
-
-```
-gem 'trinidad'
-```
-
-**Rails**
-
-If you already have Trinidad in your Gemfile you can start the server with the rails command:
-
-```
-$ rails s trinidad
 ```
 
 **Rackup**
@@ -70,7 +75,8 @@ Or you can set Trinidad by default in your `config.ru` file:
 
 ## Configuration
 
-Trinidad allows you to configure some parameters when the server is started from the command line, the following is a list of the currently supported options:
+Trinidad allows you to configure parameters from the command line, the following 
+is a list of the currently supported options (try `trinidad -h`):
 
 ```
   * -p, --port PORT               =>  port to bind to.
@@ -86,47 +92,110 @@ Trinidad allows you to configure some parameters when the server is started from
   * -g, --log LEVEL               =>  set the log level, default INFO.
   * --apps APPS_BASE_DIRECTORY    =>  set the applications base directory.
 ```
-You can also specify a default web.xml to configure your web application. By default the server tries to load the file `config/web.xml` but you can modify this path by adding the option `default_web_xml` within your configuration file.
 
-Other advanced options can be found on the wiki: http://wiki.github.com/trinidad/trinidad/advanced-configuration
+You can also specify a default *web.xml* to configure your web application. 
+By default the server tries to load the file *config/web.xml* but you can change
+the path by adding the option `default_web_xml` within your configuration file.
 
-### Yaml comfiguration
+### YAML Configuration
 
-The server can also be configured from a yaml file. By default, if a file is not specified, the server tries to load the file `config/trinidad.yml`. Within this file you can add other options like jruby.min.runtimes(:jruby _ min _ runtimes) or jruby.max.runtimes(:jruby _ max _ runtimes).
+The server can also be configured from a .yml file. By default, if a file is 
+not specified, the server tries to load *config/trinidad.yml*.
+Within this file you can specify options available on the command line and tune 
+server settings or configure multiple applications to be hosted on the server.
+
+Advanced configuration options are explained in the wiki: 
+http://wiki.github.com/trinidad/trinidad/advanced-configuration
+
 
 ```
-$ jruby -S trinidad --config my_custom_configuration.yml
+$ jruby -S trinidad --config my_trinidad.yml
 ```
 
 ```yml
 ---
-  port: 4000
+  port: 4242
   address: 0.0.0.0
 ```
 
-### Ruby configuration
+### Ruby Configuration
 
-You can use pure ruby to configure Trinidad. Actually, the yaml configuration file is mapped directly into this configuration. It follows the same convention as the yaml configuration so the file `config/trinidad.rb` is loaded by default if if exists.
+As an alternative to the *config/trinidad.yml* file, a .rb configuration file 
+might be used to setup Trinidad. It follows the same convention as the yaml 
+configuration - the file `config/trinidad.rb` is loaded by default if exists.
 
 ```ruby
 Trinidad.configure do |config|
-  config.port = 4000
+  config.port = 4242
   config.address = '0.0.0.0'
 end
 ```
 
-## Hot deployment
+### Logging
 
-Although the early versions of Trinidad used an extension to let deploy applications monitorizing a file, since Trinidad 1.1.0 this feature is integrated into the core. When the file `tmp/restart.txt` is modified, the server reloads the application that the file belongs. This file can be modified with the option `monitor`.
+As you might notice on your first `trinidad` the server uses standard output :
 
-## Virtual hosts
+```
+kares@theborg:~/workspace/trinidad/MegaUpload$ trinidad -p 8000 -e staging
+Initializing ProtocolHandler ["http-bio-8000"]
+Starting Servlet Engine: Apache Tomcat/7.0.28
+Starting ProtocolHandler ["http-bio-8000"]
+Context with name [/] has started rolling
+Context with name [/] has completed rolling
+```
 
-It's posible to configure Trinidad with multiple hosts and load the applications under them automatically. Take into account that each host must have its applications in a different directory.
+It also prints warnings and error messages on error output, while application 
+specific log messages (e.g. logs from `Rails.logger`) always go into the expected
+file location at *log/{environment}.log*. 
+
+Application logging performs daily file rolling out of the box and only prints 
+messages to the console while it runs in development mode, that means you won't
+see any application specific output on the console say in production !
+
+Please note that these logging details as well as the logging format will be 
+configurable with *trinidad.yml/.rb* within the next **1.4.x** release.
+
+## Hot Deployment
+
+Trinidad supports monitoring a file to reload applications, when the file 
+*tmp/restart.txt* is updated (e.g. `touch tmp/restart.txt`), the server reloads 
+the application the file belongs. 
+The file monitor can be customized with the `monitor` configuration option.
+
+Since version **1.4.0** Trinidad supports 2 reload strategies :
+
+* **restart** (default) synchronous reloading (exposed by Tomcat). This strategy
+  pauses incoming requests while it reloads the application and than serves them
+  once ready (or timeouts if it takes too long). It has been chosen as the default
+  strategy since **1.4.0** due it's more predictable memory requirements.
+
+* **rolling** "zero-downtime" (asynchronous) reloading strategy similar to 
+  Passenger's rolling reloads. This has been the default since **1.1.0** up till
+  the **1.3.x** line. If you use this you should account that your JVM memory
+  requirements might increase quite a lot (esp. if you reload under heavy loads)
+  since requests are being served while there's another version of the
+  application being loaded.
+
+Configure the reload strategy per web application or globally e.g. :
+
+```yml
+---
+  port: 8080
+  environment: production
+  reload_strategy: rolling
+```
+
+## Virtual Hosts
+
+It's possible to use Trinidad with multiple hosts and load the applications under 
+them automatically. Please remember that each host must have its applications in 
+a different directory.
 
 ```ruby
 Trinidad.configure do |config|
   config.hosts = {
-    # applications_path => host_name_list (the first one in the list is real host name, the other ones are aliases)
+    # applications_path => host_name_list 
+    # (first one is the real host name, the other ones are aliases)
     'app_local' => ['localhost', '127.0.0.1'],
     'apps_lol'  => ['lolhost', 'lol'],
     'apps_foo'  => 'foo'
@@ -134,14 +203,16 @@ Trinidad.configure do |config|
 end
 ```
 
-If the applications are configured via the web_apps section, the host for each app can be added with the key `hosts` under each application. If several applications belong to the same host put them under the same directory and specify the name of the host for each one:
+If applications are configured via the `web_apps` section, the host for each app
+can be added with the `hosts` key under each application. 
+If several applications belong to the same host put them under the same directory
+and specify the name of the host for each one e.g. :
 
 ```ruby
 Trinidad.configure do |config|
   config.web_apps = {
     :mock1 => {
       :web_app_dir => 'rails_apps/mock1',
-      # host_name_list (the first one in the list is real host name, the other ones are aliases)
       :hosts       => ['rails.virtual.host', 'rails.host']
     },
     :mock2 => {
@@ -150,7 +221,6 @@ Trinidad.configure do |config|
     },
     :mock3 => {
       :web_app_dir => 'rack_apps/mock3',
-      # host_name_list (the first one in the list is real host name, the other ones are aliases)
       :hosts       => ['rack.virtual.host', 'rack.host']
     }
   }
@@ -159,8 +229,8 @@ end
 
 ## Extensions
 
-Trinidad allows to extend the server with more Tomcat features, here is a list of current available "official" extensions:
-
+Trinidad allows to extend itself with more (not just Tomcat) features, 
+here is a list of the available extensions that are "officially supported":
 
 * Database Connection Pooling: http://github.com/trinidad/trinidad_dbpool_extension
 * Daemonize Trinidad, based on Akuma: http://github.com/trinidad/trinidad_daemon_extension
@@ -169,10 +239,11 @@ Trinidad allows to extend the server with more Tomcat features, here is a list o
 * Application and Server Lifecycle Management: http://github.com/trinidad/trinidad_lifecycle_extension
 * Trinidad's Management Console and REST API: http://github.com/trinidad/trinidad_sandbox_extension
 * Scheduler, based on Quartz: http://github.com/trinidad/trinidad_scheduler_extension
+* Valves - components inserted into the request pipeline (e.g. Access Log): http://github.com/trinidad/trinidad_valve_extension
 
-
-You can find further information on how to write your own extension in the wiki: http://wiki.github.com/trinidad/trinidad/extensions
+You can find further information on how to write extensions in the wiki: 
+http://wiki.github.com/trinidad/trinidad/extensions
 
 ## Copyright
 
-Copyright (c) 2011-2012 David Calavera<calavera@apache.org>. See LICENSE for details.
+Copyright (c) 2011-2012 David Calavera. See LICENSE for details.
