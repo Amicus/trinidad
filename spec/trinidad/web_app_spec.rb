@@ -26,6 +26,126 @@ describe Trinidad::WebApp do
     app.should be_a(Trinidad::RackupWebApp)
   end
 
+  it "creates a RackupWebApp if no Rails code in environment.rb" do
+    environment_rb = "#{MOCK_WEB_APP_DIR}/config/environment.rb"
+    begin
+      create_config_file environment_rb, "" +
+        "require 'rubygems'\n" +
+        "require 'sinatra'\n\n" +
+        "get ('/') { 'Hello world!' }"
+
+      app = Trinidad::WebApp.create({ :web_app_dir => MOCK_WEB_APP_DIR })
+      app.should be_a(Trinidad::RackupWebApp)
+    ensure
+      FileUtils.rm environment_rb
+    end
+  end
+
+  after do
+    environment_rb = "#{MOCK_WEB_APP_DIR}/config/environment.rb"
+    application_rb = "#{MOCK_WEB_APP_DIR}/config/application.rb"
+    FileUtils.rm environment_rb if File.exist?(environment_rb)
+    FileUtils.rm application_rb if File.exist?(application_rb)
+  end
+  
+  it "creates a RackupWebApp if no Rails code in environment.rb/application.rb" do
+    environment_rb = "#{MOCK_WEB_APP_DIR}/config/environment.rb"
+    application_rb = "#{MOCK_WEB_APP_DIR}/config/application.rb"
+    begin
+      create_config_file environment_rb, "" +
+        "require 'sinatra'\n\n" +
+        "get '/' do\n" +
+        "  'Hello world!'\n" +
+        "end\n"
+      create_config_file application_rb, "\n"
+
+      app = Trinidad::WebApp.create({ :web_app_dir => MOCK_WEB_APP_DIR })
+      app.should be_a(Trinidad::RackupWebApp)
+    ensure
+      #FileUtils.rm [environment_rb, application_rb]
+    end
+  end
+  
+  it "creates a RailsWebApp if Rails 2.3 code in environment.rb" do
+    environment_rb = "#{MOCK_WEB_APP_DIR}/config/environment.rb"
+    begin
+      create_config_file environment_rb, "" +
+      "# Be sure to restart your server when you modify this file\n" +
+      "\n" +
+      "# Specifies gem version of Rails to use when vendor/rails is not present\n" +
+      "RAILS_GEM_VERSION = '2.3.14' unless defined? RAILS_GEM_VERSION\n" +
+      "\n" +
+      "# Bootstrap the Rails environment, frameworks, and default configuration\n" +
+      "require File.join(File.dirname(__FILE__), 'boot')\n" +
+      "\n" +
+      "Rails::Initializer.run do |config|\n" +
+      " # ... \n" +
+      "end"
+
+      app = Trinidad::WebApp.create({ :web_app_dir => MOCK_WEB_APP_DIR })
+      app.should be_a(Trinidad::RailsWebApp)
+    ensure
+      #FileUtils.rm environment_rb
+    end
+  end
+  
+  it "creates a RailsWebApp if Rails 3.x code in environment.rb/application.rb" do
+    environment_rb = "#{MOCK_WEB_APP_DIR}/config/environment.rb"
+    application_rb = "#{MOCK_WEB_APP_DIR}/config/application.rb"
+    begin
+      create_config_file environment_rb, "\n" +
+        "# Load the rails application \n" +
+        "require File.expand_path('../application', __FILE__) \n" +
+        " \n " +
+        "# Initialize the rails application \n" +
+        "Rails3x::Application.initialize! \n"
+      create_config_file application_rb, "\n" +
+        "require File.expand_path('../boot', __FILE__)\n" +
+        "\n" +
+        "require 'rails/all'\n" +
+        "\n" +
+        "if defined?(Bundler)\n" +
+        "  # If you precompile assets before deploying to production, use this line\n" +
+        "  Bundler.require(*Rails.groups(:assets => %w(development test)))\n" +
+        "  # If you want your assets lazily compiled in production, use this line\n" +
+        "  # Bundler.require(:default, :assets, Rails.env)\n" +
+        "end\n" +
+        "\n" +
+        "module Rails3x\n" +
+        "  class Application < Rails::Application\n" +
+        "    # ... \n" +
+        "  end\n" +
+        "end\n"
+
+      app = Trinidad::WebApp.create({ :web_app_dir => MOCK_WEB_APP_DIR })
+      app.should be_a(Trinidad::RailsWebApp)
+    ensure
+      #FileUtils.rm [environment_rb, application_rb]
+    end
+  end
+  
+  it "detects a RailsWebApp if (minimal) Rails code in environment.rb" do
+    environment_rb = "#{MOCK_WEB_APP_DIR}/config/environment.rb"
+    begin
+      create_config_file environment_rb, "" +
+      "require 'rubygems' \n" +
+      "%w(action_controller/railtie).map &method(:require) \n" +
+      "\n" +
+      "class TrinidadTest < Rails::Application \n" +
+      "  config.secret_token = routes.append { root :to => 'send_file#deliver' }.inspect \n" +
+      "  initialize! \n" +
+      "end \n" +
+      "\n" +
+      "#  ... \n" +
+      "\n"
+
+      app = Trinidad::WebApp.create({ :web_app_dir => MOCK_WEB_APP_DIR })
+      app.should be_a(Trinidad::RailsWebApp)
+    ensure
+      #FileUtils.rm environment_rb
+    end
+  end
+  
   it "ignores rack_servlet when a deployment descriptor already provides it" do
     FakeFS do
       create_rails_web_xml
@@ -380,6 +500,48 @@ describe Trinidad::WebApp do
 
       app.should be_a(Trinidad::RackupWebApp)
       app.context_params['rackup.path'].should == 'main/config.ru'
+    end
+  end
+  
+  it "parses (context-param) xml values correctly" do
+    FileUtils.touch custom_web_xml = "#{MOCK_WEB_APP_DIR}/config/custom.web.xml"
+    begin
+      create_config_file custom_web_xml, '' +
+        '<?xml version="1.0" encoding="UTF-8"?>' +
+        '<web-app>' +
+        '  <context-param>' +
+        '    <param-name>jruby.initial.runtimes</param-name>' +
+        '    <param-value>1</param-value>' +
+        '  </context-param>' +
+        '  <filter>' +
+        '    <filter-name>RackFilter</filter-name>' +
+        '    <filter-class>org.jruby.rack.RackFilter</filter-class>' +
+        '  </filter>' +
+        '  <listener>' +
+        '    <listener-class>org.jruby.rack.rails.RailsServletContextListener</listener-class>' +
+        '  </listener>' +
+        '' +
+        '  <context-param>' +
+        '    <param-name>jruby.rack.logging.name</param-name>' +
+        '    <param-value>/root</param-value>' +
+        '  </context-param>' +
+        '</web-app>'
+      web_app = Trinidad::WebApp.create({}, {
+        :context_path => '/',
+        :web_app_dir => MOCK_WEB_APP_DIR,
+        :default_web_xml => 'config/custom.web.xml'
+      })
+      
+      web_app.web_xml_context_param('jruby.rack.logging').should be nil
+      web_app.web_xml_context_param('jruby.rack.logging.name').should == '/root'
+      
+      web_app.web_xml_filter?('org.jruby.rack.RackFilter').should be true
+      web_app.web_xml_filter?('org.jruby.rack.Rack').should be false
+      
+      web_app.web_xml_listener?('org.jruby.rack.rails').should be false
+      web_app.web_xml_listener?('org.jruby.rack.rails.RailsServletContextListener').should be true
+    ensure
+      FileUtils.rm custom_web_xml
     end
   end
   
